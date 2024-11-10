@@ -1,0 +1,468 @@
+<?php
+session_start();
+include('../connect.php');
+
+include 'config.php';
+
+// التحقق من وجود ID الحساب في الجلسة
+if (!isset($_SESSION['id'])) {
+    header("Location: login.php");
+    exit();
+}
+
+// الحصول على ID الحساب من الجلسة
+$account_id = $_SESSION['id'];
+
+// استعلام للحصول على رقم المدرب من جدول الحسابات
+$admin_query = "SELECT `id` FROM `training_admins` WHERE `account_id` = ?";
+$stmt = $con->prepare($admin_query);
+$stmt->bindValue(1, $account_id, PDO::PARAM_INT);
+$stmt->execute();
+$admin = $stmt->fetch(PDO::FETCH_ASSOC);
+
+// التحقق من وجود المدرب
+if (!$admin) {
+    header("Location: login.php");
+    exit();
+}
+
+// استخدام ID المدرب من جدول المدربين
+$training_admin_id = $admin['id'];
+
+// التأكد من أن البيانات تم إرسالها
+
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+    // استرجاع البيانات من النموذج
+    $student_id = $_GET['student_id'];
+    
+    // التأكد من أن بيانات الجودة تم إرسالها
+    if (isset($_POST['quality'])) {
+        $quality = $_POST['quality']; // يجب أن تكون مصفوفة هنا
+
+
+        // استعلام لإدخال البيانات في جدول التقييمات
+        $insert_query = "INSERT INTO student_scores (evaluation_element, evaluation_score, student_id, training_admin_id) VALUES (?, ?, ?, ?)";
+        $stmt = $con->prepare($insert_query);
+        
+        // إعداد القيم للإدخال
+        $evaluation_elements = [
+            "المحافظة على اوقات الدوام", 
+            "الالتزام باجراءات وانظمة العمل", 
+            "المظهر العام للمتدرب", 
+            "انجاز ما يكلف به المتدرب بشكل مناسب", 
+            "المرونة و القدرة على التكيف", 
+            "التعامل مع الزملاء و المدربيين", 
+            "القدرة على استيعاب المعلومات", 
+            "القدرة على تحمل المسؤولية", 
+            "المبادرة و القدرة على الابتكار و الابداع", 
+            "الحرص على جدية التدريب"
+        ];
+
+        $success = true; // متغير لتتبع نجاح الإدخال
+
+        // تكرار العناصر لإدخالها
+        $student_scores = mysqli_query($conn, "SELECT * FROM `student_scores` WHERE student_id = '$student_id' AND training_admin_id = '$training_admin_id'") or die('query failed');
+    if(mysqli_num_rows($student_scores) < 0) {
+        foreach ($evaluation_elements as $index => $element) {
+            if (isset($quality[$index])) { // التأكد من أن قيمة الجودة موجودة
+                $score = $quality[$index]; // الحصول على الدرجات من مصفوفة الدرجات
+                if (!$stmt->execute([$element, $score, $student_id, $training_admin_id])) { // إدخال البيانات والتحقق من النجاح
+                    $success = false; // إذا فشل الإدخال، قم بتغيير الحالة
+                    break; // توقف عن المحاولة في حالة الفشل
+                }
+            }
+        }
+             // رسالة نجاح أو فشل
+      if ($success) {
+    echo "<script>alert('تم تقييم الطالب بنجاح.'); window.location.href='students.php';</script>";
+} else {
+    echo "<script>alert('حدث خطأ أثناء تقييم الطالب. يرجى التحقق من البيانات المدخلة.'); window.location.href='students.php';</script>";
+}
+    } else {
+         echo "<script>alert('تم تقييم هذا الطالب من قبل , لا يمكن التقييم مرتين.'); window.location.href='students.php';</script>";
+    }
+        
+
+   
+        exit();
+    
+
+
+ } else {
+        echo "<script>alert('يرجى اختيار تقييم.');</script>";
+    }
+}
+
+?>
+
+
+
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="utf-8"/>
+    <title>وحدة التدريب التعاوني</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta content="Premium Multipurpose Admin & Dashboard" name="description"/>
+    <meta content="Themesbrand" name="author"/>
+    <!-- App favicon -->
+    <link rel="shortcut icon" href="images/logo.jpeg">
+
+    <!-- Bootstrap Css -->
+    <link href="css/bootstrap-rtl.min.css" id="bootstrap-style" rel="stylesheet" type="text/css"/>
+    <!-- Icons Css -->
+    <link href="css/icons-rtl.min.css" rel="stylesheet" type="text/css"/>
+    <!-- App Css-->
+    <link href="css/app-rtl.min.css" id="app-style" rel="stylesheet" type="text/css"/>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300&display=swap" rel="stylesheet">
+<style>
+        * {
+            font-family: 'IBM Plex Sans Arabic', sans-serif;
+        }
+        .table {
+            border: 1px solid #ccc; /* إضافة حد للجدول */
+            background-color: white; /* خلفية بيضاء للجدول */
+        }
+        .table th, .table td {
+            text-align: right; /* محاذاة النص لليمين */
+            border: 1px solid #ddd; /* حدود للخلايا */
+        }
+        .rating-label {
+            display: block; /* عرض النص في سطر جديد */
+            margin-bottom: 5px; /* مساحة بين النص وزر الراديو */
+        }
+    </style>
+</head>
+
+<body data-sidebar="dark" cz-shortcut-listen="true">
+
+<!-- Begin page -->
+<div id="layout-wrapper">
+
+    <header id="page-topbar">
+        <div class="navbar-header">
+            <div class="d-flex">
+                <!-- LOGO -->
+                <div class="navbar-brand-box">
+                    <a href="index.php" class="logo logo-dark">
+                                <span class="logo-sm">
+                                    <img src="images/logo.png" alt="" height="22">
+                                </span>
+                        <span class="logo-lg">
+                                    <img src="images/logo.png" alt="" height="20">
+                                </span>
+                    </a>
+
+                    <a href="index.php" class="logo logo-light">
+                                <span class="logo-sm">
+                                    <img src="images/logo.png" alt="" style="height: 60px;width: 60px" height="22">
+                                </span>
+                        <span class="logo-lg">
+                                    <img src="images/logo.png" alt=""  height="20">
+                                </span>
+                    </a>
+                </div>
+
+                <button type="button" class="btn btn-sm px-3 font-size-16 header-item waves-effect vertical-menu-btn">
+                    <i class="fa fa-fw fa-bars"></i>
+                </button>
+
+                <!-- App Search-->
+                 <div class="ms-5 my-auto">
+                    <?php
+
+                        include('../connect.php');  
+                        $sql1 = $con->prepare("SELECT * FROM training_admins WHERE account_id='$account_id'");      
+                        $sql1->execute();
+                        $rows1 = $sql1->fetch();
+                        
+
+                    ?> 
+                    <span>مرحبا بك</span>, <b><?php echo $rows1['name']; ?></b>
+                </div>
+
+            </div>
+
+            <div class="d-flex">
+
+                <!-- <div class="dropdown d-inline-block">
+                    <button style="cursor: default" type="button" class="btn header-item waves-effect"  data-bs-toggle="dropdown"
+                            aria-haspopup="true" aria-expanded="false">
+                        <img class="rounded-circle header-profile-user" src="images/sa.png" alt="Header Avatar">
+                    </button>
+                </div> -->
+
+                
+                
+                <div class="dropdown d-inline-block">
+                    <button type="button" style="cursor: default" class="btn header-item" id="page-header-user-dropdown"
+                        data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                        
+                        <span  class="d-none d-xl-inline-block ms-1 fw-medium font-size-15">مشرف ميداني</span>
+                    </button>
+                </div>
+
+                <div class="dropdown d-inline-block">
+                    <button type="button"  data-bs-toggle="modal" data-bs-target="#logout"
+                            class="btn header-item waves-effect"
+                            aria-haspopup="true" aria-expanded="false">
+                        <span class="d-none d-xl-inline-block ms-1 fw-medium font-size-15 text-danger">تسجيل الخروج <i class="fas fa-sign-out-alt ms-1" style="scale: -1;"></i></span>
+                    </button>
+                </div>
+
+            </div>
+        </div>
+
+    </header>
+    <div class="modal fade" id="logout" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">تسجيل الخروج !</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    هل أنت متأكد من تسجيل الخروج ؟
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">تراجع</button>
+                    <a href="../logout.php" type="button" class="btn btn-danger">تسجيل خروج</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- ========== Left Sidebar Start ========== -->
+    <div class="vertical-menu mm-active">
+
+        <!-- LOGO -->
+        <div class="navbar-brand-box">
+
+            <div>
+                <a href="index.php" class="logo logo-light">
+                <span class="logo-lg">
+                    <img src="images/logo.png" style="display: block;
+                        margin-left: auto;
+                        margin-right: auto;
+                        height: 100px;">
+                </span>
+                </a>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn-sm px-3 font-size-16 header-item waves-effect vertical-menu-btn">
+            <i class="fa fa-fw fa-bars"></i>
+        </button>
+
+        <div data-simplebar="init" class="sidebar-menu-scroll mm-show">
+            <div class="simplebar-wrapper" style="margin: 0px;">
+                <div class="simplebar-height-auto-observer-wrapper">
+                    <div class="simplebar-height-auto-observer"></div>
+                </div>
+                <div class="simplebar-mask" style="margin-top: 30px">
+                    <div class="simplebar-offset" style="right: 0px; bottom: 0px;">
+                        <div class="simplebar-content-wrapper"
+                             style="height: 100%; overflow: hidden; padding-right: 0px; padding-bottom: 0px;">
+                            <div class="simplebar-content" style="padding: 0px;">
+
+                                <!--- Sidemenu -->
+                                <div id="sidebar-menu" class="mm-active">
+                                    <!-- Left Menu Start -->
+                                    <ul class="metismenu list-unstyled mm-show" id="side-menu">
+                                        <li class="">
+                                            <a href="index.php" class="active" aria-expanded="false">
+                                                <i class="fas fa-home"></i>
+                                                <span>الصفحة الرئيسية</span>
+                                            </a>
+                                        </li>
+
+                                        <li class="">
+                                            <a href="profile.php" class="active" aria-expanded="false">
+                                                <i class="fas fa-user-edit"></i>
+                                                <span>تعديل الملف الشخصي</span>
+                                            </a>
+                                        </li>
+
+                                        <li class="">
+                                            <a href="#" class="active">
+                                                <small class="text-muted">الادارة</small>
+                                            </a>
+                                        </li>
+                                        <li class="">
+                                            <a href="students.php" class="active" aria-expanded="false">
+                                                <i class="fas fa-file-alt"></i>
+                                                <span>بيانات الطلاب</span>
+                                            </a>
+                                        </li>
+                                        <li class="">
+                                            <a href="academic_admins.php" class="active" aria-expanded="false">
+                                                <i class="fas fa-user-tie"></i>
+                                                <span>المشرفين الاكاديميين</span>
+                                            </a>
+                                        </li>
+                                        <li class="">
+                                            <a href="absences.php" class="active" aria-expanded="false">
+                                                <i class="fas fa-users"></i>
+                                                <span>حضور وغياب الطلاب</span>
+                                            </a>
+                                        </li>
+                                        <li class="">
+                                            <a href="#" class="active">
+                                                <small class="text-muted">اخرى</small>
+                                            </a>
+                                        </li>
+                                        <li class="">
+                                            <a href="chats.php" class="active" aria-expanded="false">
+                                                <i class="fas fa-comments"></i>
+                                                <span>المحادثات</span>
+                                            </a>
+                                        </li>
+                                        
+                                    </ul>
+                                </div>
+                                <!-- Sidebar -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="simplebar-placeholder" style="width: auto; height: 169px;"></div>
+            </div>
+            <div class="simplebar-track simplebar-horizontal" style="visibility: hidden;">
+                <div class="simplebar-scrollbar" style="transform: translate3d(0px, 0px, 0px); display: none;"></div>
+            </div>
+            <div class="simplebar-track simplebar-vertical" style="visibility: hidden;">
+                <div class="simplebar-scrollbar"
+                     style="height: 519px; transform: translate3d(0px, 0px, 0px); display: none;"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Left Sidebar End -->
+
+    <div class="modal fade" id="notification" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="exampleModalLabel">ارسال اعلان لكل الطلاب</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form action="#">
+                        <div>
+                            <h4 class="form-label" for="name">محتوى الاعلان</h4>
+                            <textarea  type="text" class="form-control" style="text-align: right" name="name" id="name" required
+                                    placeholder="أدخل محتوى الاعلان المراد ارساله" rows="5"></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-dark" data-bs-dismiss="modal">تراجع</button>
+                    <a href="../index.php" type="button" class="btn btn-success">ارسال <i class="fa fa-paper-plane"></i></a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================== -->
+    <!-- Start right Content here -->
+    <!-- ============================================================== -->
+    <div class="main-content">
+
+        <div class="page-content">
+            <div class="container-fluid">
+
+ <div class="container mt-5">
+    <h2>تقييم الطالب</h2>
+    <form method="POST" onsubmit="return confirmSubmit()">
+    <input type="hidden" name="student_id" value="<?php echo htmlspecialchars($student['student_id']); ?>">
+    <table class="table table-bordered" style="vertical-align: middle;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>عناصر التقييم</th>
+                <th style="text-align: center" colspan="5">درجة التقييم</th>
+            </tr>
+            <tr>
+                <th></th>
+                <th></th>
+                <th>ممتاز (10)</th>
+                <th>جيد جدا (8)</th>
+                <th>جيد (6)</th>
+                <th>مقبول (4)</th>
+                <th>ضعيف (2)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php 
+            $evaluation_elements = [
+                "المحافظة على اوقات الدوام", 
+                "الالتزام باجراءات وانظمة العمل", 
+                "المظهر العام للمتدرب", 
+                "انجاز ما يكلف به المتدرب بشكل مناسب", 
+                "المرونة و القدرة على التكيف", 
+                "التعامل مع الزملاء و المدربيين", 
+                "القدرة على استيعاب المعلومات", 
+                "القدرة على تحمل المسؤولية", 
+                "المبادرة و القدرة على الابتكار و الابداع", 
+                "الحرص على جدية التدريب"
+            ];
+            
+            foreach ($evaluation_elements as $index => $element): ?>
+                <tr>
+                    <td><?php echo $index + 1; ?></td>
+                    <td><?php echo $element; ?></td>
+                    <td><input type="radio" name="quality[<?php echo $index; ?>]" value="10"></td>
+                    <td><input type="radio" name="quality[<?php echo $index; ?>]" value="8"></td>
+                    <td><input type="radio" name="quality[<?php echo $index; ?>]" value="6"></td>
+                    <td><input type="radio" name="quality[<?php echo $index; ?>]" value="4"></td>
+                    <td><input type="radio" name="quality[<?php echo $index; ?>]" value="2"></td>
+                </tr>
+            <?php endforeach; ?>
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-success">ارسال التقييم</button>
+    <a href="students.php" class="btn btn-secondary">إلغاء</a>
+</form>
+
+<script>
+    function confirmSubmit() {
+        return confirm('Are you sure?');
+    }
+</script>
+
+</div>
+
+            </div>
+        </div>
+        <!-- End Page-content -->
+
+
+        <footer class="footer">
+           <div class="container-fluid">
+                <div class="row">
+                    <div class="col-sm-6">
+                        2024 © وحدة التدريب التعاوني.
+                    </div>
+                </div>
+            </div>
+        </footer> 
+    </div>
+    <!-- end main content-->
+
+</div>
+<!-- END layout-wrapper -->
+
+
+<!-- JAVASCRIPT -->
+<script src="js/jquery.min.js"></script>
+<script src="js/bootstrap.bundle.min.js"></script>
+<script src="js/metisMenu.min.js"></script>
+
+
+<script src="js/dashboard.init.js"></script>
+
+<!-- App js -->
+<script src="js/app.js"></script>
+
+</body>
+</html>
